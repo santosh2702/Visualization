@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Cosmic Visualizations</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        nav {
+            background: #222;
+            padding: 10px;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+        nav a {
+            color: #fff;
+            margin: 0 15px;
+            text-decoration: none;
+            font-size: 18px;
+        }
+        nav a:hover {
+            color: #00f;
+        }
+        section {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding-top: 60px;
+            scroll-margin-top: 60px;
+        }
+        h2 {
+            margin-bottom: 10px;
+        }
+        canvas {
+            width: 80%;
+            height: 80%;
+            max-width: 1200px;
+            max-height: 800px;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="#dyson-sphere">Dyson Sphere</a>
+        <a href="#solar-system">Solar System</a>
+        <a href="#galaxy">Galaxy</a>
+        <a href="#universe">Universe</a>
+        <a href="#black-hole">Black Hole</a>
+        <a href="#pulsar">Pulsar</a>
+    </nav>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <section id="dyson-sphere">
+        <h2>Dyson Sphere Visualization</h2>
+        <canvas id="dyson-canvas"></canvas>
+        <script type="module">
+            import * as THREE from 'three';
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+            try {
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('dyson-canvas') });
+                renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+
+                const systemGroup = new THREE.Group();
+                scene.add(systemGroup);
+
+                const sphereGeometry = new THREE.BufferGeometry();
+                const sphereParticles = 200;
+                const positions = new Float32Array(sphereParticles * 3);
+                const colors = new Float32Array(sphereParticles * 3);
+                const radius = 50;
+                for (let i = 0; i < sphereParticles; i++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+                    positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    positions[i * 3 + 2] = radius * Math.cos(phi);
+                    const colorProgress = i / sphereParticles;
+                    colors[i * 3] = Math.sin(colorProgress * Math.PI) * 0.4 + 0.2;
+                    colors[i * 3 + 1] = Math.sin(colorProgress * Math.PI * 0.5) * 0.6 + 0.2;
+                    colors[i * 3 + 2] = Math.cos(colorProgress * Math.PI) * 0.4 + 0.4;
+                }
+                sphereGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                sphereGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                const sphereMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 2 });
+                const sphere = new THREE.Points(sphereGeometry, sphereMaterial);
+                systemGroup.add(sphere);
+
+                const numRings = 5;
+                const particlesPerRing = 50;
+                const rings = [];
+                for (let i = 0; i < numRings; i++) {
+                    const ringRadius = 100 + (i * 50);
+                    const ringGeometry = new THREE.BufferGeometry();
+                    const ringPositions = new Float32Array(particlesPerRing * 3);
+                    const ringColors = new Float32Array(particlesPerRing * 3);
+                    for (let j = 0; j < particlesPerRing; j++) {
+                        const initialAngle = (j / particlesPerRing) * Math.PI * 2;
+                        ringPositions[j * 3] = ringRadius * Math.cos(initialAngle);
+                        ringPositions[j * 3 + 1] = ringRadius * Math.sin(initialAngle);
+                        ringPositions[j * 3 + 2] = 0;
+                        const color = [[1, 0, 0], [1, 0.5, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1]][i];
+                        ringColors[j * 3] = color[0];
+                        ringColors[j * 3 + 1] = color[1];
+                        ringColors[j * 3 + 2] = color[2];
+                    }
+                    ringGeometry.setAttribute('position', new THREE.BufferAttribute(ringPositions, 3));
+                    ringGeometry.setAttribute('color', new THREE.BufferAttribute(ringColors, 3));
+                    const ringMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 1.5 });
+                    const ring = new THREE.Points(ringGeometry, ringMaterial);
+                    ring.userData = { radius: ringRadius, period: 10 + i * 2, inclination: Math.random() * Math.PI / 2, phase: Math.random() * Math.PI * 2, axisOffset: Math.random() * Math.PI * 2 };
+                    rings.push(ring);
+                    systemGroup.add(ring);
+                }
+
+                camera.position.z = 300;
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    systemGroup.rotation.y += 0.005;
+                    sphere.rotation.y += 0.01;
+                    const time = performance.now() * 0.001;
+                    rings.forEach(ring => {
+                        const positions = ring.geometry.attributes.position.array;
+                        for (let i = 0; i < positions.length / 3; i++) {
+                            const orbitalAngle = (time / ring.userData.period + (i / (positions.length / 3)) * Math.PI * 2 + ring.userData.phase) % (Math.PI * 2);
+                            const inclination = ring.userData.inclination;
+                            const axisRotation = Math.sin(time * 0.002) * Math.PI;
+                            positions[i * 3] = ring.userData.radius * Math.sin(orbitalAngle) * Math.cos(inclination) * Math.cos(axisRotation + ring.userData.axisOffset);
+                            positions[i * 3 + 1] = ring.userData.radius * Math.sin(orbitalAngle) * Math.sin(inclination);
+                            positions[i * 3 + 2] = ring.userData.radius * Math.cos(orbitalAngle) * Math.sin(axisRotation + ring.userData.axisOffset);
+                        }
+                        ring.geometry.attributes.position.needsUpdate = true;
+                    });
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+                });
+            } catch (error) {
+                console.error('Dyson Sphere Error:', error);
+            }
+        </script>
+    </section>
+
+    <section id="solar-system">
+        <h2>Solar System Visualization</h2>
+        <canvas id="solar-system-canvas"></canvas>
+        <script type="module">
+            import * as THREE from 'three';
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+            try {
+                console.log('Starting Solar System initialization');
+                const canvas = document.getElementById('solar-system-canvas');
+                if (!canvas) throw new Error('Solar System canvas not found');
+                console.log('Canvas found:', canvas);
+
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+                const renderer = new THREE.WebGLRenderer({ canvas: canvas });
+                if (!renderer) throw new Error('Renderer creation failed');
+                renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+                console.log('Renderer initialized');
+
+                const solarSystemGroup = new THREE.Group();
+                scene.add(solarSystemGroup);
+
+                const planets = [
+                    { name: "Sun", radius: 100, color: 0xFFFF00, orbitRadius: 0, period: 5, particles: 300 },
+                    { name: "Mercury", radius: 10, color: 0xC0C0C0, orbitRadius: 200, period: 10, particles: 50 },
+                    { name: "Venus", radius: 15, color: 0xFFA500, orbitRadius: 300, period: 12, particles: 60 },
+                    { name: "Earth", radius: 16, color: 0x0000FF, orbitRadius: 400, period: 14, particles: 70 },
+                    { name: "Mars", radius: 12, color: 0xFF4500, orbitRadius: 500, period: 16, particles: 60 },
+                    { name: "Jupiter", radius: 40, color: 0xDAA520, orbitRadius: 700, period: 20, particles: 100 },
+                    { name: "Saturn", radius: 35, color: 0xFFD700, orbitRadius: 900, period: 24, particles: 90 },
+                    { name: "Uranus", radius: 25, color: 0x00CED1, orbitRadius: 1100, period: 28, particles: 80 },
+                    { name: "Neptune", radius: 24, color: 0x000080, orbitRadius: 1300, period: 32, particles: 80 },
+                    { name: "Pluto", radius: 8, color: 0x8A2BE2, orbitRadius: 1500, period: 36, particles: 40 }
+                ];
+
+                const planetsGroup = [];
+                planets.forEach((planet, index) => {
+                    const geometry = new THREE.BufferGeometry();
+                    const positions = new Float32Array(planet.particles * 3);
+                    const colors = new Float32Array(planet.particles * 3);
+                    for (let i = 0; i < planet.particles; i++) {
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.acos(2 * Math.random() - 1);
+                        positions[i * 3] = planet.radius * Math.sin(phi) * Math.cos(theta);
+                        positions[i * 3 + 1] = planet.radius * Math.sin(phi) * Math.sin(theta);
+                        positions[i * 3 + 2] = planet.radius * Math.cos(phi);
+                        const colorProgress = i / planet.particles;
+                        colors[i * 3] = ((planet.color >> 16) & 0xff) / 255 * (Math.sin(colorProgress * Math.PI) * 0.4 + 0.2);
+                        colors[i * 3 + 1] = ((planet.color >> 8) & 0xff) / 255 * (Math.sin(colorProgress * Math.PI * 0.5) * 0.6 + 0.2);
+                        colors[i * 3 + 2] = (planet.color & 0xff) / 255 * (Math.cos(colorProgress * Math.PI) * 0.4 + 0.4);
+                    }
+                    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                    const material = new THREE.PointsMaterial({ vertexColors: true, size: 2 });
+                    const planetObj = new THREE.Points(geometry, material);
+                    planetObj.position.set(planet.orbitRadius, 0, 0);
+                    planetsGroup.push(planetObj);
+                    solarSystemGroup.add(planetObj);
+                    console.log(`Added ${planet.name} at ${planet.orbitRadius}`);
+                });
+
+                const starGeometry = new THREE.BufferGeometry();
+                const starCount = 1000;
+                const starPositions = new Float32Array(starCount * 3);
+                const starColors = new Float32Array(starCount * 3);
+                for (let i = 0; i < starCount; i++) {
+                    const x = (Math.random() - 0.5) * 5000;
+                    const y = (Math.random() - 0.5) * 5000;
+                    const z = (Math.random() - 0.5) * 5000;
+                    starPositions[i * 3] = x;
+                    starPositions[i * 3 + 1] = y;
+                    starPositions[i * 3 + 2] = z;
+                    const color = [Math.random() * 0.3 + 0.7, Math.random() * 0.3 + 0.7, Math.random() * 0.3 + 0.7];
+                    starColors[i * 3] = color[0];
+                    starColors[i * 3 + 1] = color[1];
+                    starColors[i * 3 + 2] = color[2];
+                }
+                starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+                starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+                const starMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 0.5 });
+                const stars = new THREE.Points(starGeometry, starMaterial);
+                scene.add(stars);
+                console.log('Added stars');
+
+                camera.position.z = 2000;
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.minDistance = 500;
+                controls.maxDistance = 4000;
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    solarSystemGroup.rotation.y += 0.001;
+                    const time = performance.now() * 0.001;
+                    planetsGroup.forEach((planet, index) => {
+                        planet.rotation.y += 0.01;
+                        const planetData = planets[index];
+                        if (index > 0) {
+                            const angle = time / planetData.period + index * Math.PI / 4;
+                            planet.position.x = planetData.orbitRadius * Math.cos(angle);
+                            planet.position.z = planetData.orbitRadius * Math.sin(angle);
+                        }
+                    });
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+                });
+            } catch (error) {
+                console.error('Solar System Error:', error);
+            }
+        </script>
+    </section>
+
+    <section id="galaxy">
+        <h2>Galaxy Visualization</h2>
+        <canvas id="galaxy-canvas"></canvas>
+        <script type="module">
+            import * as THREE from 'three';
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+            try {
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+                const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('galaxy-canvas') });
+                renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+
+                const galaxyGroup = new THREE.Group();
+                scene.add(galaxyGroup);
+
+                const milkyWayGeometry = new THREE.BufferGeometry();
+                const milkyWayParticles = 1000;
+                const milkyWayPositions = new Float32Array(milkyWayParticles * 3);
+                const milkyWayColors = new Float32Array(milkyWayParticles * 3);
+                for (let i = 0; i < milkyWayParticles; i++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const radius = Math.random() * 50;
+                    milkyWayPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+                    milkyWayPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    milkyWayPositions[i * 3 + 2] = radius * Math.cos(phi);
+                    const colorProgress = i / milkyWayParticles;
+                    milkyWayColors[i * 3] = Math.sin(colorProgress * Math.PI) * 0.4 + 0.2;
+                    milkyWayColors[i * 3 + 1] = Math.sin(colorProgress * Math.PI) * 0.4 + 0.2;
+                    milkyWayColors[i * 3 + 2] = Math.cos(colorProgress * Math.PI) * 0.4 + 0.4;
+                }
+                milkyWayGeometry.setAttribute('position', new THREE.BufferAttribute(milkyWayPositions, 3));
+                milkyWayGeometry.setAttribute('color', new THREE.BufferAttribute(milkyWayColors, 3));
+                const milkyWayMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 2 });
+                const milkyWay = new THREE.Points(milkyWayGeometry, milkyWayMaterial);
+                galaxyGroup.add(milkyWay);
+
+                const starGeometry = new THREE.BufferGeometry();
+                const starCount = 1000;
+                const starPositions = new Float32Array(starCount * 3);
+                const starColors = new Float32Array(starCount * 3);
+                for (let i = 0; i < starCount; i++) {
+                    const x = (Math.random() - 0.5) * 5000;
+                    const y = (Math.random() - 0.5) * 5000;
+                    const z = (Math.random() - 0.5) * 5000;
+                    starPositions[i * 3] = x;
+                    starPositions[i * 3 + 1] = y;
+                    starPositions[i * 3 + 2] = z;
+                    const color = [Math.random() * 0.3 + 0.7, Math.random() * 0.3 + 0.7, Math.random() * 0.3 + 0.7];
+                    starColors[i * 3] = color[0];
+                    starColors[i * 3 + 1] = color[1];
+                    starColors[i * 3 + 2] = color[2];
+                }
+                starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+                starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+                const starMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 0.5 });
+                const stars = new THREE.Points(starGeometry, starMaterial);
+                scene.add(stars);
+
+                camera.position.z = 2000;
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.minDistance = 500;
+                controls.maxDistance = 6000;
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    galaxyGroup.rotation.y += 0.001;
+                    milkyWay.rotation.y += 0.01;
+                    const time = performance.now() * 0.001;
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+                });
+            } catch (error) {
+                console.error('Galaxy Error:', error);
+            }
+        </script>
+    </section>
+
+    <section id="universe">
+        <h2>Universe Visualization</h2>
+        <canvas id="universe-canvas"></canvas>
+        <script type="module">
+            import * as THREE from 'three';
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+            try {
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50000);
+                const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('universe-canvas') });
+                renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+
+                const universeGroup = new THREE.Group();
+                scene.add(universeGroup);
+
+                const milkyWayGeometry = new THREE.BufferGeometry();
+                const milkyWayParticles = 1000;
+                const milkyWayPositions = new Float32Array(milkyWayParticles * 3);
+                const milkyWayColors = new Float32Array(milkyWayParticles * 3);
+                for (let i = 0; i < milkyWayParticles; i++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const radius = Math.random() * 50;
+                    milkyWayPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+                    milkyWayPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                    milkyWayPositions[i * 3 + 2] = radius * Math.cos(phi);
+                    const colorProgress = i / milkyWayParticles;
+                    milkyWayColors[i * 3] = Math.sin(colorProgress * Math.PI) * 0.4 + 0.2;
+                    milkyWayColors[i * 3 + 1] = Math.sin(colorProgress * Math.PI) * 0.4 + 0.2;
+                    milkyWayColors[i * 3 + 2] = Math.cos(colorProgress * Math.PI) * 0.4 + 0.4;
+                }
+                milkyWayGeometry.setAttribute('position', new THREE.BufferAttribute(milkyWayPositions, 3));
+                milkyWayGeometry.setAttribute('color', new THREE.BufferAttribute(milkyWayColors, 3));
+                const milkyWayMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 2 });
+                const milkyWay = new THREE.Points(milkyWayGeometry, milkyWayMaterial);
+                universeGroup.add(milkyWay);
+
+                const galaxyCount = 5000;
+                for (let i = 0; i < galaxyCount; i++) {
+                    const galaxyGeometry = new THREE.BufferGeometry();
+                    const galaxyParticles = 50;
+                    const galaxyPositions = new Float32Array(galaxyParticles * 3);
+                    const galaxyColors = new Float32Array(galaxyParticles * 3);
+                    let x, y, z;
+                    const structureType = Math.random();
+                    const distance = 2000 + Math.random() * 20000;
+                    if (structureType < 0.3) { // Clusters
+                        const clusterCenter = new THREE.Vector3(
+                            (Math.random() - 0.5) * 15000,
+                            (Math.random() - 0.5) * 15000,
+                            (Math.random() - 0.5) * 15000
+                        );
+                        x = clusterCenter.x + (Math.random() - 0.5) * 1000;
+                        y = clusterCenter.y + (Math.random() - 0.5) * 1000;
+                        z = clusterCenter.z + (Math.random() - 0.5) * 1000;
+                    } else if (structureType < 0.6) { // Walls
+                        x = (Math.random() - 0.5) * 20000;
+                        y = (Math.random() - 0.5) * 2000;
+                        z = (Math.random() - 0.5) * 20000;
+                    } else { // Filaments
+                        const t = Math.random() * Math.PI * 2;
+                        x = distance * Math.cos(t);
+                        y = (Math.random() - 0.5) * 20000;
+                        z = distance * Math.sin(t);
+                        x += (Math.random() - 0.5) * 1000;
+                        z += (Math.random() - 0.5) * 1000;
+                    }
+                    for (let j = 0; j < galaxyParticles; j++) {
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.acos(2 * Math.random() - 1);
+                        const radius = Math.random() * 50;
+                        galaxyPositions[j * 3] = x + radius * Math.sin(phi) * Math.cos(theta);
+                        galaxyPositions[j * 3 + 1] = y + radius * Math.sin(phi) * Math.sin(theta);
+                        galaxyPositions[j * 3 + 2] = z + radius * Math.cos(phi);
+                        const color = [Math.random() * 0.5 + 0.5, Math.random() * 0.5 + 0.5, Math.random() * 0.5 + 0.5];
+                        galaxyColors[j * 3] = color[0];
+                        galaxyColors[j * 3 + 1] = color[1];
+                        galaxyColors[j * 3 + 2] = color[2];
+                    }
+                    galaxyGeometry.setAttribute('position', new THREE.BufferAttribute(galaxyPositions, 3));
+                    galaxyGeometry.setAttribute('color', new THREE.BufferAttribute(galaxyColors, 3));
+                    const galaxyMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 1 });
+                    const galaxy = new THREE.Points(galaxyGeometry, galaxyMaterial);
+                    universeGroup.add(galaxy);
+                }
+
+                const starGeometry = new THREE.BufferGeometry();
+                const starCount = 10000;
+                const starPositions = new Float32Array(starCount * 3);
+                const starColors = new Float32Array(starCount * 3);
+                for (let i = 0; i < starCount; i++) {
+                    const x = (Math.random() - 0.5) * 40000;
+                    const y = (Math.random() - 0.5) * 40000;
+                    const z = (Math.random() - 0.5) * 40000;
+                    starPositions[i * 3] = x;
+                    starPositions[i * 3 + 1] = y;
+                    starPositions[i * 3 + 2] = z;
+                    const color = [Math.random() * 0.3 + 0.7, Math.random() * 0.3 + 0.7, Math.random() * 0.3 + 0.7];
+                    starColors[i * 3] = color[0];
+                    starColors[i * 3 + 1] = color[1];
+                    starColors[i * 3 + 2] = color[2];
+                }
+                starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+                starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+                const starMaterial = new THREE.PointsMaterial({ vertexColors: true, size: 0.5 });
+                const stars = new THREE.Points(starGeometry, starMaterial);
+                scene.add(stars);
+
+                camera.position.set(0, 0, 5000);
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.minDistance = 1000;
+                controls.maxDistance = 30000;
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    universeGroup.rotation.y += 0.0002;
+                    milkyWay.rotation.y += 0.01;
+                    const time = performance.now() * 0.001;
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+                });
+            } catch (error) {
+                console.error('Universe Error:', error);
+            }
+        </script>
+    </section>
+
+    <section id="black-hole">
+        <h2>Black Hole Visualization</h2>
+        <canvas id="black-hole-canvas"></canvas>
+        <script type="module">
+            import * as THREE from 'three';
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+            try {
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('black-hole-canvas') });
+                renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+
+                // Black hole event horizon
+                const eventHorizonGeometry = new THREE.SphereGeometry(50, 32, 32);
+                const eventHorizonMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.8 });
+                const eventHorizon = new THREE.Mesh(eventHorizonGeometry, eventHorizonMaterial);
+                scene.add(eventHorizon);
+
+                // Accretion disk
+                const diskGeometry = new THREE.RingGeometry(60, 100, 32);
+                const diskMaterial = new THREE.MeshBasicMaterial({ color: 0xFF4500, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+                const accretionDisk = new THREE.Mesh(diskGeometry, diskMaterial);
+                accretionDisk.rotation.x = Math.PI / 2;
+                scene.add(accretionDisk);
+
+                // Gravitational lensing effect (simplified with a subtle glow)
+                const lensingGeometry = new THREE.RingGeometry(40, 45, 32);
+                const lensingMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, side: THREE.DoubleSide, transparent: true, opacity: 0.3 });
+                const lensingEffect = new THREE.Mesh(lensingGeometry, lensingMaterial);
+                lensingEffect.rotation.x = Math.PI / 2;
+                scene.add(lensingEffect);
+
+                camera.position.z = 300;
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    const time = performance.now() * 0.001;
+                    accretionDisk.rotation.z += 0.01;
+                    lensingEffect.rotation.z += 0.005;
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+                });
+            } catch (error) {
+                console.error('Black Hole Error:', error);
+            }
+        </script>
+    </section>
+
+    <section id="pulsar">
+        <h2>Pulsar Visualization</h2>
+        <canvas id="pulsar-canvas"></canvas>
+        <script type="module">
+            import * as THREE from 'three';
+            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+            try {
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('pulsar-canvas') });
+                renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+
+                // Pulsar core
+                const pulsarGeometry = new THREE.SphereGeometry(20, 32, 32);
+                const pulsarMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+                const pulsar = new THREE.Mesh(pulsarGeometry, pulsarMaterial);
+                scene.add(pulsar);
+
+                // Pulse effect
+                const pulseGeometry = new THREE.SphereGeometry(25, 32, 32);
+                const pulseMaterial = new THREE.MeshBasicMaterial({ color: 0x00FFFF, transparent: true, opacity: 0 });
+                const pulse = new THREE.Mesh(pulseGeometry, pulseMaterial);
+                scene.add(pulse);
+
+                camera.position.z = 200;
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    const time = performance.now() * 0.001;
+                    pulsar.rotation.y += 0.02;
+                    const pulseIntensity = Math.sin(time * 5) * 0.5 + 0.5; // Pulsing effect
+                    pulseMaterial.opacity = pulseIntensity * 0.8;
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+                });
+            } catch (error) {
+                console.error('Pulsar Error:', error);
+            }
+        </script>
+    </section>
+</body>
+</html>
